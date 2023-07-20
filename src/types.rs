@@ -1,19 +1,21 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, rc::Rc};
+
+pub type RStr = Rc<str>;
 
 #[derive(Debug, PartialEq)]
 pub enum DocElement {
     HtmlElement {
-        name: String,
+        name: RStr,
         children: Vec<DocElement>,
-        properties: BTreeMap<String, String>,
+        properties: BTreeMap<RStr, RStr>,
         inline: bool,
     },
-    ClosingTag(String),
-    Text(String),
+    ClosingTag(RStr),
+    Text(RStr),
 }
 
 impl DocElement {
-    pub fn display(&self) -> String {
+    pub fn display(&self) -> RStr {
         match self {
             Self::HtmlElement {
                 name,
@@ -21,15 +23,15 @@ impl DocElement {
                 properties,
                 inline,
             } => match name.as_ref() {
-                "head" => String::new(),
+                "head" | "script" | "style" => RStr::from(""),
                 "img" => {
                     let alt = properties
                         .get("alt")
                         .map_or_else(|| properties.get("src").map_or("", |src| src), |alt| alt);
                     if alt.is_empty() {
-                        String::from("[image]")
+                        RStr::from("[image]")
                     } else {
-                        format!("[image: {alt}]")
+                        RStr::from(format!("[image: {alt}]"))
                     }
                 }
                 "a" => {
@@ -49,7 +51,7 @@ impl DocElement {
                     if !href.is_empty() {
                         str_buf.push_str(&format!("[{href}]"));
                     }
-                    str_buf
+                    RStr::from(str_buf)
                 }
                 _ => {
                     let mut str_buf = String::new();
@@ -63,11 +65,11 @@ impl DocElement {
                         }
                         str_buf.push_str(child.display().trim());
                     }
-                    str_buf
+                    RStr::from(str_buf)
                 }
             },
             Self::Text(txt) => txt.clone(),
-            Self::ClosingTag(_) => String::new(),
+            Self::ClosingTag(_) => RStr::from(""),
         }
     }
 
@@ -92,8 +94,8 @@ impl DocElement {
                 properties,
                 inline,
             },
-            Self::Text(txt) => Self::Text(txt.trim().to_string()),
-            Self::ClosingTag(_) => Self::Text(String::new()),
+            Self::Text(txt) => Self::Text(RStr::from(txt.trim())),
+            Self::ClosingTag(_) => Self::Text(RStr::from("")),
         }
     }
 }

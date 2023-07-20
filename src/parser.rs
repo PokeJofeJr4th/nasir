@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, iter::Peekable};
 
-use crate::types::DocElement;
+use crate::types::{DocElement, RStr};
 
 pub fn parse_html(html: &str) -> Result<DocElement, String> {
     let mut chars = if html.to_lowercase().starts_with("<!doctype html>") {
@@ -21,7 +21,6 @@ enum TagType {
     DocType,
 }
 
-#[allow(clippy::too_many_lines)]
 fn inner_parse<T: Iterator<Item = char>>(chars: &mut Peekable<T>) -> Result<DocElement, String> {
     match chars.next() {
         Some('<') => {
@@ -50,7 +49,7 @@ fn inner_parse<T: Iterator<Item = char>>(chars: &mut Peekable<T>) -> Result<DocE
                 }
             }
             // no longer needs to be mutable
-            let tag_name = name_buf;
+            let tag_name: RStr = name_buf.into();
             consume_whitespace(chars);
             match tag_type {
                 TagType::Closing => {
@@ -70,83 +69,12 @@ fn inner_parse<T: Iterator<Item = char>>(chars: &mut Peekable<T>) -> Result<DocE
                         doctype_buf.push(c);
                     }
                     if tag_name.starts_with("--") && doctype_buf.ends_with("--") {
-                        Ok(DocElement::Text(String::new()))
+                        Ok(DocElement::Text("".into()))
                     } else {
-                        Ok(DocElement::ClosingTag(doctype_buf))
+                        Ok(DocElement::ClosingTag(doctype_buf.into()))
                     }
                 }
-                TagType::Opening => {
-                    let mut props_buf = BTreeMap::new();
-                    'props: loop {
-                        if chars.peek() == Some(&'>') {
-                            chars.next();
-                            break;
-                        }
-                        let mut prop = String::new();
-                        while let Some(c) = chars.peek() {
-                            if c.is_alphanumeric() || *c == '-' {
-                                prop.push(*c);
-                                chars.next();
-                            } else if *c == '/' && prop.is_empty() {
-                                chars.next();
-                                break;
-                            } else {
-                                break;
-                            }
-                        }
-                        consume_whitespace(chars);
-                        // if the next char isn't eq (eg `<script src="..." defer>`),
-                        // put it empty and continue
-                        let Some('=') = chars.peek() else {
-                            props_buf.insert(prop, String::new());
-                            continue 'props;
-                        };
-                        // consume `=`
-                        chars.next();
-                        consume_whitespace(chars);
-                        let Some(barrier @ ('"' | '\'')) = chars.next() else { return Err(format!("Missing `\"` in `<{tag_name} {prop}=\"...\">`"))};
-                        let mut content = String::new();
-                        while let Some(c) = chars.next() {
-                            if c == barrier {
-                                break;
-                            } else if c == '\\' {
-                                content.push(c);
-                                let Some(c) = chars.next() else { return Err(String::from("Unexpected end of file")) };
-                                content.push(c);
-                            } else {
-                                content.push(c);
-                            }
-                        }
-                        consume_whitespace(chars);
-                        props_buf.insert(prop, content);
-                    }
-                    // let Some('>') = chars.next() else { return Err(format!("Missing `>` for `<{tag_name}>`")) };
-                    let inline = matches!(tag_name.as_ref(), "p" | "a");
-                    if matches!(tag_name.as_ref(), "meta" | "link" | "img") {
-                        Ok(DocElement::HtmlElement {
-                            name: tag_name,
-                            children: Vec::new(),
-                            properties: props_buf,
-                            inline,
-                        })
-                    } else {
-                        // get children
-                        let mut children_buf = Vec::new();
-                        while chars.peek().is_some() {
-                            let child = inner_parse(chars)?;
-                            if child == DocElement::ClosingTag(tag_name.clone()) {
-                                break;
-                            }
-                            children_buf.push(child);
-                        }
-                        Ok(DocElement::HtmlElement {
-                            name: tag_name,
-                            children: children_buf,
-                            properties: props_buf,
-                            inline,
-                        })
-                    }
-                }
+                TagType::Opening => get_opening_properties(chars, tag_name),
             }
         }
         Some(c) => {
@@ -158,9 +86,96 @@ fn inner_parse<T: Iterator<Item = char>>(chars: &mut Peekable<T>) -> Result<DocE
                 txt_buf.push(*c);
                 chars.next();
             }
-            Ok(DocElement::Text(txt_buf))
+            Ok(DocElement::Text(txt_buf.into()))
         }
-        None => Ok(DocElement::Text(String::new())),
+        None => Ok(DocElement::Text(RStr::from(""))),
+    }
+}
+
+fn get_opening_properties<T: Iterator<Item = char>>(
+    chars: &mut Peekable<T>,
+    tag_name: RStr,
+) -> Result<DocElement, String> {
+    let mut props_buf = BTreeMap::new();
+    'props: loop {
+        if chars.peek() == Some(&'>') {
+            chars.next();
+            break;
+        }
+        let mut prop = String::new();
+        while let Some(c) = chars.peek() {
+            if c.is_alphanumeric() || *c == '-' {
+                prop.push(*c);
+                chars.next();
+            } else if *c == '/' && prop.is_empty() {
+                chars.next();
+                break;
+            } else {
+                break;
+            }
+        }
+        consume_whitespace(chars);
+        // if the next char isn't eq (eg `<script src="..." defer>`),
+        // put it empty and continue
+        let Some('=') = chars.peek() else {
+                        props_buf.insert(prop.into(), RStr::from(""));
+                        continue 'props;
+                    };
+        // consume `=`
+        chars.next();
+        consume_whitespace(chars);
+        let mut content = String::new();
+        if let Some(&barrier @ ('"' | '\'')) = chars.peek() {
+            chars.next();
+            while let Some(c) = chars.next() {
+                if c == barrier {
+                    break;
+                } else if c == '\\' {
+                    content.push(c);
+                    let Some(c) = chars.next() else { return Err(String::from("Unexpected end of file")) };
+                    content.push(c);
+                } else {
+                    content.push(c);
+                }
+            }
+        } else {
+            while let Some(&c) = chars.peek() {
+                if c.is_alphanumeric() {
+                    content.push(c);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+        }
+        consume_whitespace(chars);
+        props_buf.insert(prop.into(), content.into());
+    }
+    // let Some('>') = chars.next() else { return Err(format!("Missing `>` for `<{tag_name}>`")) };
+    let inline = matches!(tag_name.as_ref(), "p" | "a");
+    if matches!(tag_name.as_ref(), "meta" | "link" | "img") {
+        Ok(DocElement::HtmlElement {
+            name: tag_name,
+            children: Vec::new(),
+            properties: props_buf,
+            inline,
+        })
+    } else {
+        // get children
+        let mut children_buf = Vec::new();
+        while chars.peek().is_some() {
+            let child = inner_parse(chars)?;
+            if child == DocElement::ClosingTag(tag_name.clone()) {
+                break;
+            }
+            children_buf.push(child);
+        }
+        Ok(DocElement::HtmlElement {
+            name: tag_name,
+            children: children_buf,
+            properties: props_buf,
+            inline,
+        })
     }
 }
 
