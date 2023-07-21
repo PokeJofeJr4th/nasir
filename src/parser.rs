@@ -86,7 +86,7 @@ fn inner_parse<T: Iterator<Item = char>>(chars: &mut Peekable<T>) -> Result<DocE
                 txt_buf.push(*c);
                 chars.next();
             }
-            Ok(DocElement::Text(txt_buf.into()))
+            Ok(DocElement::Text(transform_text(&txt_buf)))
         }
         None => Ok(DocElement::Text(RStr::from(""))),
     }
@@ -185,4 +185,12 @@ fn consume_whitespace<T: Iterator<Item = char>>(chars: &mut Peekable<T>) {
             return;
         }
     }
+}
+
+fn transform_text(input: &str) -> RStr {
+    input
+        .replace("&nbsp;", " ")
+        .replace("&quot;", "\"")
+        .replace("&amp;", "&")
+        .into()
 }

@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
-use super::{RStr, TerminalLine};
+use crossterm::terminal::SetTitle;
+
+use super::{InteractionType, RStr, TerminalLine};
 
 #[derive(Debug, PartialEq)]
 pub enum DocElement {
@@ -14,15 +16,43 @@ pub enum DocElement {
 }
 
 impl DocElement {
-    pub fn display(&self) -> Vec<TerminalLine> {
+    pub fn display(&self, set_title: &mut SetTitle<RStr>) -> Vec<TerminalLine> {
         match self {
             Self::HtmlElement {
                 name,
                 children,
                 properties,
             } => match name.as_ref() {
+                // this should only set the title
+                "head" => {
+                    let mut children_buf: Vec<&Self> = children.iter().collect();
+                    while let Some(child) = children_buf.pop() {
+                        if let Self::HtmlElement {
+                            name,
+                            children,
+                            properties: _,
+                        } = child
+                        {
+                            if &**name == "title" {
+                                let title = children
+                                    .iter()
+                                    // get the terminal lines
+                                    .flat_map(|tl| tl.display(set_title))
+                                    // get the text
+                                    .map(|tl| tl.display(false))
+                                    // make it into a string
+                                    .map(|rstr| String::from(&*rstr))
+                                    .collect::<String>();
+                                set_title.0 = format!("Nasir: {title}").into();
+                            } else {
+                                children_buf.extend(children);
+                            }
+                        }
+                    }
+                    Vec::new()
+                }
                 // this is for elements that shouldn't display anything under them
-                "head" | "script" | "style" | "option" => Vec::new(),
+                "script" | "style" | "option" => Vec::new(),
                 "img" => {
                     let alt = properties
                         .get("alt")
@@ -33,24 +63,39 @@ impl DocElement {
                         vec![RStr::from(format!("[image: {alt}]")).into()]
                     }
                 }
-                "a" => {
-                    let href: RStr = properties.get("href").map_or("".into(), Clone::clone);
-                    children
+                _ => {
+                    let ret: Vec<TerminalLine> = children
                         .iter()
-                        .flat_map(Self::display)
+                        .flat_map(|tl| tl.display(set_title))
                         .filter(|tl| !tl.is_empty())
-                        .map(|content| {
-                            content
-                                .map_focused(|str| format!("({str})[{href}]").into())
-                                .with_interaction(super::InteractionType::Link(href.clone()))
-                        })
-                        .collect()
+                        .collect();
+                    match &**name {
+                        "a" => {
+                            let href: RStr = properties.get("href").map_or("".into(), Clone::clone);
+                            ret.into_iter()
+                                .map(|content| {
+                                    content
+                                        .map_focused(|str| {
+                                            format!("({str})[\x1b[94m{href}\x1b[0m]").into()
+                                        })
+                                        .map_unfocused(|str| {
+                                            format!("\x1b[4;94m{str}\x1b[0m").into()
+                                        })
+                                        .with_interaction(InteractionType::Link(href.clone()))
+                                })
+                                .collect()
+                        }
+                        "b" | "strong" => ret
+                            .into_iter()
+                            .map(|tl| tl.map(|rstr| format!("\x1b[1m{rstr}\x1b[0m").into()))
+                            .collect(),
+                        "i" => ret
+                            .into_iter()
+                            .map(|tl| tl.map(|rstr| format!("\x3b[1m{rstr}\x1b[0m").into()))
+                            .collect(),
+                        _ => ret,
+                    }
                 }
-                _ => children
-                    .iter()
-                    .flat_map(Self::display)
-                    .filter(|tl| !tl.is_empty())
-                    .collect(),
             },
             Self::Text(txt) => vec![txt.clone().into()],
             Self::ClosingTag(_) => vec![RStr::from("").into()],

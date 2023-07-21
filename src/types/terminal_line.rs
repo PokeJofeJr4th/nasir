@@ -7,30 +7,30 @@ pub struct TerminalLine {
 }
 
 impl TerminalLine {
-    // pub fn map(self, f: impl Fn(RStr) -> RStr) -> Self {
-    //     Self {
-    //         focused_text: f(self.focused_text),
-    //         unfocused_text: f(self.unfocused_text),
-    //         interaction_type: self.interaction_type,
-    //     }
-    // }
+    pub fn map(self, f: impl Fn(RStr) -> RStr) -> Self {
+        Self {
+            focused_text: f(self.focused_text),
+            unfocused_text: f(self.unfocused_text),
+            interaction_type: self.interaction_type,
+        }
+    }
 
-    // pub fn map_unfocused(self, f: impl Fn(RStr) -> RStr) -> Self {
-    //     Self {
-    //         unfocused_text: f(self.unfocused_text),
-    //         ..self
-    //     }
-    // }
+    pub fn map_unfocused(self, f: impl Fn(RStr) -> RStr) -> Self {
+        Self {
+            unfocused_text: f(self.unfocused_text),
+            ..self
+        }
+    }
 
     pub const fn interaction(&self) -> &InteractionType {
         &self.interaction_type
     }
 
-    pub fn display(&self, is_focused: bool) -> RStr {
+    pub fn display(&self, is_focused: bool) -> String {
         if is_focused {
-            self.focused_text.clone()
+            format!(">{}", self.focused_text)
         } else {
-            self.unfocused_text.clone()
+            format!(" {}", self.unfocused_text)
         }
     }
 

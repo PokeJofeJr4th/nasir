@@ -1,11 +1,13 @@
 #![warn(clippy::nursery, clippy::pedantic)]
 
 use core::time;
+use std::io::stdout;
 
 use clap::Parser;
 use crossterm::{
     event::{self, KeyCode},
-    terminal::{self, disable_raw_mode, enable_raw_mode},
+    execute,
+    terminal::{self, disable_raw_mode, enable_raw_mode, SetTitle},
 };
 use reqwest::blocking as http;
 
@@ -26,11 +28,7 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    let fetch = fetch_html(&args.url, args.verbose);
-    if args.verbose {
-        println!("{fetch:#?}");
-    }
-    render_html(&fetch);
+    browse(&args.url, args.verbose);
 }
 
 // fn fetch(url: &str) -> Result<String, reqwest::Error> {
@@ -56,13 +54,27 @@ fn fetch_html(url: &str, verbose: bool) -> DocElement {
     }
 }
 
-fn render_html(html: &DocElement) {
+fn browse(url: &str, verbose: bool) {
+    let mut set_title = SetTitle("".into());
     enable_raw_mode().unwrap();
-    let mut htmelements = html.display();
+    let mut breadcrumbs = vec![String::from(url)];
+    let fetched = fetch_html(url, verbose);
+    if verbose {
+        println!("{fetched:#?}");
+    }
+    let mut htmelements = fetched.display(&mut set_title);
+    execute!(stdout(), set_title).unwrap();
     let mut focused = 0;
     loop {
         if htmelements.len() <= focused {
             focused = htmelements.len() - 1;
+        }
+        let lines = render_lines(&htmelements, focused);
+        // clear the screen
+        println!("\x1B[2J\x1B[1;1H");
+        // print out the current window
+        for l in lines {
+            println!("{l}");
         }
         while matches!(event::poll(time::Duration::from_secs(0)), Ok(false)) {}
         if let Ok(event::Event::Key(event::KeyEvent {
@@ -72,34 +84,45 @@ fn render_html(html: &DocElement) {
         })) = event::read()
         {
             match code {
-                KeyCode::Esc => break,
-                KeyCode::Up | KeyCode::PageUp => {
+                KeyCode::Esc => {
+                    breadcrumbs.pop();
+                    if let Some(last) = breadcrumbs.last() {
+                        follow_link(RStr::from(last.as_ref()), &mut htmelements, verbose);
+                        focused = 0;
+                    } else {
+                        break;
+                    }
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
                     focused = focused.saturating_sub(1);
                 }
-                KeyCode::Down | KeyCode::PageDown => focused += 1,
+                KeyCode::Down | KeyCode::Char('j') => focused += 1,
                 KeyCode::Enter => {
                     if let InteractionType::Link(link) = htmelements[focused].interaction() {
-                        todo!("navigate to {link}")
+                        breadcrumbs.push(String::from(&**link));
+                        follow_link(link.clone(), &mut htmelements, verbose);
+                        focused = 0;
                     }
                 }
                 _ => {}
             }
         }
-        let lines = render_lines(&htmelements, focused);
-        // clear the screen
-        print!("\x1B[2J\x1B[1;1H");
-        for l in lines {
-            println!("{l}");
-        }
     }
     disable_raw_mode().unwrap();
 }
 
+fn follow_link(link: RStr, htmelements: &mut Vec<TerminalLine>, verbose: bool) {
+    let fetched = fetch_html(&link, verbose);
+    let mut set_title = SetTitle(link);
+    *htmelements = fetched.display(&mut set_title);
+    execute!(stdout(), set_title).unwrap();
+}
+
 /// print out the lines out of a parsed html
-fn render_lines(lines: &[TerminalLine], focused: usize) -> Vec<RStr> {
+fn render_lines(lines: &[TerminalLine], focused: usize) -> Vec<String> {
     let mut effective_focus = focused;
     let min = 0;
-    let window_height = terminal::size().unwrap().1 as usize / 2;
+    let window_height = terminal::size().unwrap().1 as usize / 2 - 1;
     let max = lines.len();
     // can't focus past the end of the page
     if effective_focus > max {
