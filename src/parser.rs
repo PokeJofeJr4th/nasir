@@ -115,7 +115,7 @@ fn get_opening_properties<T: Iterator<Item = char>>(
             }
         }
         consume_whitespace(chars);
-        // if the next char isn't eq (eg `<script src="..." defer>`),
+        // if the next char isn't eq (eg `<script defer>`),
         // put it empty and continue
         let Some('=') = chars.peek() else {
                         props_buf.insert(prop.into(), RStr::from(""));
@@ -152,13 +152,12 @@ fn get_opening_properties<T: Iterator<Item = char>>(
         props_buf.insert(prop.into(), content.into());
     }
     // let Some('>') = chars.next() else { return Err(format!("Missing `>` for `<{tag_name}>`")) };
-    let inline = matches!(tag_name.as_ref(), "p" | "a");
-    if matches!(tag_name.as_ref(), "meta" | "link" | "img") {
+    // This is where it checks if you need a closing tag
+    if matches!(tag_name.as_ref(), "meta" | "link" | "img" | "input") {
         Ok(DocElement::HtmlElement {
             name: tag_name,
             children: Vec::new(),
             properties: props_buf,
-            inline,
         })
     } else {
         // get children
@@ -174,7 +173,6 @@ fn get_opening_properties<T: Iterator<Item = char>>(
             name: tag_name,
             children: children_buf,
             properties: props_buf,
-            inline,
         })
     }
 }
