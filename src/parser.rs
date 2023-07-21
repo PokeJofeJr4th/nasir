@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, iter::Peekable};
 
-use crate::types::{DocElement, RStr};
+use crate::types::{DocElement, RStr, SELF_CLOSING_TAGS};
 
 pub fn parse_html(html: &str) -> Result<DocElement, String> {
     let mut chars = if html.to_lowercase().starts_with("<!doctype html>") {
@@ -97,6 +97,7 @@ fn get_opening_properties<T: Iterator<Item = char>>(
     tag_name: RStr,
 ) -> Result<DocElement, String> {
     let mut props_buf = BTreeMap::new();
+    let mut closed = false;
     'props: loop {
         if chars.peek() == Some(&'>') {
             chars.next();
@@ -109,6 +110,7 @@ fn get_opening_properties<T: Iterator<Item = char>>(
                 chars.next();
             } else if *c == '/' && prop.is_empty() {
                 chars.next();
+                closed = true;
                 break;
             } else {
                 break;
@@ -153,7 +155,7 @@ fn get_opening_properties<T: Iterator<Item = char>>(
     }
     // let Some('>') = chars.next() else { return Err(format!("Missing `>` for `<{tag_name}>`")) };
     // This is where it checks if you need a closing tag
-    if matches!(tag_name.as_ref(), "meta" | "link" | "img" | "input") {
+    if SELF_CLOSING_TAGS.contains(&&*tag_name) | closed {
         Ok(DocElement::HtmlElement {
             name: tag_name,
             children: Vec::new(),

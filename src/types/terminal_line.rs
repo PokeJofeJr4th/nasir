@@ -1,8 +1,10 @@
 use super::RStr;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TerminalLine {
     focused_text: RStr,
     unfocused_text: RStr,
+    html_id: Option<RStr>,
     interaction_type: InteractionType,
 }
 
@@ -11,7 +13,7 @@ impl TerminalLine {
         Self {
             focused_text: f(self.focused_text),
             unfocused_text: f(self.unfocused_text),
-            interaction_type: self.interaction_type,
+            ..self
         }
     }
 
@@ -52,6 +54,18 @@ impl TerminalLine {
             ..self
         }
     }
+
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn with_id(self, id: RStr) -> Self {
+        Self {
+            html_id: Some(id),
+            ..self
+        }
+    }
+
+    pub fn check_id<T: PartialEq<RStr>>(&self, id: T) -> bool {
+        self.html_id.as_ref().map_or(false, |str| id == str.clone())
+    }
 }
 
 impl From<RStr> for TerminalLine {
@@ -60,10 +74,12 @@ impl From<RStr> for TerminalLine {
             focused_text: value.clone(),
             unfocused_text: value,
             interaction_type: InteractionType::None,
+            html_id: None,
         }
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InteractionType {
     // Input(String),
     // Toggle(bool),

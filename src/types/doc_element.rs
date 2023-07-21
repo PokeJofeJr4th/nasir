@@ -43,7 +43,7 @@ impl DocElement {
                                     // make it into a string
                                     .map(|rstr| String::from(&*rstr))
                                     .collect::<String>();
-                                set_title.0 = format!("Nasir: {title}").into();
+                                set_title.0 = format!("{} - Nasir", title.trim()).into();
                             } else {
                                 children_buf.extend(children);
                             }
@@ -69,19 +69,24 @@ impl DocElement {
                         .flat_map(|tl| tl.display(set_title))
                         .filter(|tl| !tl.is_empty())
                         .collect();
-                    match &**name {
+                    let ret = match &**name {
                         "a" => {
                             let href: RStr = properties.get("href").map_or("".into(), Clone::clone);
                             ret.into_iter()
                                 .map(|content| {
-                                    content
-                                        .map_focused(|str| {
-                                            format!("({str})[\x1b[94m{href}\x1b[0m]").into()
-                                        })
-                                        .map_unfocused(|str| {
-                                            format!("\x1b[4;94m{str}\x1b[0m").into()
-                                        })
-                                        .with_interaction(InteractionType::Link(href.clone()))
+                                    // if it's already a link, prefer the lower-level one
+                                    if let InteractionType::Link(_) = content.interaction() {
+                                        content
+                                    } else {
+                                        content
+                                            .map_focused(|str| {
+                                                format!("({str})[\x1b[94m{href}\x1b[0m]").into()
+                                            })
+                                            .map_unfocused(|str| {
+                                                format!("\x1b[4;94m{str}\x1b[0m").into()
+                                            })
+                                            .with_interaction(InteractionType::Link(href.clone()))
+                                    }
                                 })
                                 .collect()
                         }
@@ -94,6 +99,10 @@ impl DocElement {
                             .map(|tl| tl.map(|rstr| format!("\x3b[1m{rstr}\x1b[0m").into()))
                             .collect(),
                         _ => ret,
+                    };
+                    match properties.get("id") {
+                        Some(id) => ret.into_iter().map(|tl| tl.with_id(id.clone())).collect(),
+                        None => ret,
                     }
                 }
             },

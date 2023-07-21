@@ -63,6 +63,9 @@ fn browse(url: &str, verbose: bool) {
         println!("{fetched:#?}");
     }
     let mut htmelements = fetched.display(&mut set_title);
+    if verbose {
+        println!("{htmelements:#?}");
+    }
     execute!(stdout(), set_title).unwrap();
     let mut focused = 0;
     loop {
@@ -85,9 +88,14 @@ fn browse(url: &str, verbose: bool) {
         {
             match code {
                 KeyCode::Esc => {
-                    breadcrumbs.pop();
+                    let current = breadcrumbs.pop().unwrap();
                     if let Some(last) = breadcrumbs.last() {
-                        follow_link(RStr::from(last.as_ref()), &mut htmelements, verbose);
+                        follow_link(
+                            &current,
+                            RStr::from(last.as_ref()),
+                            &mut htmelements,
+                            verbose,
+                        );
                         focused = 0;
                     } else {
                         break;
@@ -99,8 +107,9 @@ fn browse(url: &str, verbose: bool) {
                 KeyCode::Down | KeyCode::Char('j') => focused += 1,
                 KeyCode::Enter => {
                     if let InteractionType::Link(link) = htmelements[focused].interaction() {
-                        breadcrumbs.push(String::from(&**link));
-                        follow_link(link.clone(), &mut htmelements, verbose);
+                        let current = breadcrumbs.last().unwrap();
+                        let link = follow_link(current, link.clone(), &mut htmelements, verbose);
+                        breadcrumbs.push(String::from(&*link));
                         focused = 0;
                     }
                 }
@@ -111,17 +120,29 @@ fn browse(url: &str, verbose: bool) {
     disable_raw_mode().unwrap();
 }
 
-fn follow_link(link: RStr, htmelements: &mut Vec<TerminalLine>, verbose: bool) {
+fn follow_link(
+    current: &str,
+    link: RStr,
+    htmelements: &mut Vec<TerminalLine>,
+    verbose: bool,
+) -> RStr {
+    let link = if link.starts_with("//") {
+        format!("https:{link}").into()
+    } else if link.starts_with('/') {
+        format!("{current}{link}").into()
+    } else {
+        link
+    };
     let fetched = fetch_html(&link, verbose);
-    let mut set_title = SetTitle(link);
+    let mut set_title = SetTitle(link.clone());
     *htmelements = fetched.display(&mut set_title);
     execute!(stdout(), set_title).unwrap();
+    link
 }
 
 /// print out the lines out of a parsed html
 fn render_lines(lines: &[TerminalLine], focused: usize) -> Vec<String> {
     let mut effective_focus = focused;
-    let min = 0;
     let window_height = terminal::size().unwrap().1 as usize / 2 - 1;
     let max = lines.len();
     // can't focus past the end of the page
@@ -133,11 +154,11 @@ fn render_lines(lines: &[TerminalLine], focused: usize) -> Vec<String> {
         effective_focus = max - window_height;
     }
     // window has to start after the start of the page
-    if effective_focus < min + window_height {
+    if effective_focus < window_height {
         effective_focus = window_height;
     }
     let start = effective_focus - window_height;
-    let end = (effective_focus + window_height).min(max);
+    let end = effective_focus + window_height;
     lines
         .iter()
         .enumerate()
