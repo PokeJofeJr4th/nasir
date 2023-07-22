@@ -11,6 +11,7 @@ use crossterm::{
 };
 use reqwest::blocking as http;
 
+mod img;
 mod parser;
 mod types;
 
@@ -72,7 +73,7 @@ fn browse(url: &str, verbose: bool) {
         if htmelements.len() <= focused {
             focused = htmelements.len() - 1;
         }
-        let lines = render_lines(&htmelements, focused);
+        let lines = render_lines(&htmelements, focused, verbose);
         // clear the screen
         println!("\x1B[2J\x1B[1;1H");
         // print out the current window
@@ -126,13 +127,7 @@ fn follow_link(
     htmelements: &mut Vec<TerminalLine>,
     verbose: bool,
 ) -> RStr {
-    let link = if link.starts_with("//") {
-        format!("https:{link}").into()
-    } else if link.starts_with('/') {
-        format!("{current}{link}").into()
-    } else {
-        link
-    };
+    let link = get_link_destination(current, link);
     let fetched = fetch_html(&link, verbose);
     let mut set_title = SetTitle(link.clone());
     *htmelements = fetched.display(&mut set_title);
@@ -140,8 +135,27 @@ fn follow_link(
     link
 }
 
+/// concatenate two links
+fn get_link_destination(current: &str, link: RStr) -> RStr {
+    if link.starts_with("//") {
+        format!("https:{link}").into()
+    } else if link.starts_with('/') {
+        format!(
+            "{}{link}",
+            current
+                .split('/')
+                .take(3)
+                .map(|s| format!("{s}/"))
+                .collect::<String>()
+        )
+        .into()
+    } else {
+        link
+    }
+}
+
 /// print out the lines out of a parsed html
-fn render_lines(lines: &[TerminalLine], focused: usize) -> Vec<String> {
+fn render_lines(lines: &[TerminalLine], focused: usize, verbose: bool) -> Vec<String> {
     let mut effective_focus = focused;
     let window_height = terminal::size().unwrap().1 as usize / 2 - 1;
     let max = lines.len();
@@ -159,6 +173,9 @@ fn render_lines(lines: &[TerminalLine], focused: usize) -> Vec<String> {
     }
     let start = effective_focus - window_height;
     let end = effective_focus + window_height;
+    if verbose {
+        println!("showing window from {start} to {end}");
+    }
     lines
         .iter()
         .enumerate()
