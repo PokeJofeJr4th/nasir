@@ -1,5 +1,7 @@
 use std::{collections::BTreeMap, iter::Peekable};
 
+use lazy_regex::lazy_regex;
+
 use crate::types::{DocElement, RStr, SELF_CLOSING_TAGS};
 
 pub fn parse_html(html: &str) -> Result<DocElement, String> {
@@ -151,7 +153,7 @@ fn get_opening_properties<T: Iterator<Item = char>>(
             }
         }
         consume_whitespace(chars);
-        props_buf.insert(prop.into(), content.into());
+        props_buf.insert(prop.into(), transform_text(&content));
     }
     // let Some('>') = chars.next() else { return Err(format!("Missing `>` for `<{tag_name}>`")) };
     // This is where it checks if you need a closing tag
@@ -190,9 +192,54 @@ fn consume_whitespace<T: Iterator<Item = char>>(chars: &mut Peekable<T>) {
 }
 
 fn transform_text(input: &str) -> RStr {
-    input
+    // get hex entities
+    let input = lazy_regex!("&#x([0-9a-fA-F]+);")
+        .replace_all(input, |caps: &regex::Captures| {
+            if let Some(hex_str) = caps.get(1) {
+                if let Ok(codepoint) = u32::from_str_radix(hex_str.as_str(), 16) {
+                    if let Some(character) = std::char::from_u32(codepoint) {
+                        return character.to_string();
+                    }
+                }
+            }
+            caps[0].to_string() // Return the original match if conversion fails
+        })
+        .to_string();
+    // get decimal entities
+    lazy_regex!("&#(\\d+);")
+        .replace_all(&input, |caps: &regex::Captures| {
+            if let Some(dec_str) = caps.get(1) {
+                if let Ok(codepoint) = dec_str.as_str().parse() {
+                    if let Some(character) = std::char::from_u32(codepoint) {
+                        return character.to_string();
+                    }
+                }
+            }
+            caps[0].to_string()
+        })
         .replace("&nbsp;", " ")
-        .replace("&quot;", "\"")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
         .replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&cent;", "¢")
+        .replace("&pound;", "£")
+        .replace("&yen;", "¥")
+        .replace("&euro;", "€")
+        .replace("&copy;", "©")
+        .replace("&reg;", "®")
         .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::transform_text;
+
+    #[test]
+    fn transform() {
+        assert_eq!(transform_text("&lt;&gt;"), "<>".into());
+        assert_eq!(transform_text("&#60;&#62;"), "<>".into());
+        assert_eq!(transform_text("&#xae;"), transform_text("&reg;"));
+    }
 }

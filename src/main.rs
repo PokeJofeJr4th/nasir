@@ -13,6 +13,8 @@ use reqwest::blocking as http;
 
 mod img;
 mod parser;
+#[cfg(test)]
+mod tests;
 mod types;
 
 use crate::parser::parse_html;
@@ -139,10 +141,10 @@ fn follow_link(
 fn get_link_destination(current: &str, link: RStr) -> RStr {
     if link.starts_with("//") {
         format!("https:{link}").into()
-    } else if link.starts_with('/') {
+    } else if let Some(link) = link.strip_prefix('/') {
         format!(
             "{}{link}",
-            current
+            &current
                 .split('/')
                 .take(3)
                 .map(|s| format!("{s}/"))
