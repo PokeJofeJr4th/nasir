@@ -217,6 +217,7 @@ fn transform_text(input: &str) -> RStr {
             }
             caps[0].to_string()
         })
+        // get other entities
         .replace("&nbsp;", " ")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
@@ -229,6 +230,12 @@ fn transform_text(input: &str) -> RStr {
         .replace("&euro;", "€")
         .replace("&copy;", "©")
         .replace("&reg;", "®")
+        .replace("&trade;", "™")
+        .replace("&ndash;", "–")
+        .replace("&mdash;", "—")
+        .replace("&asymp;", "≈")
+        .replace("&ne;", "≠")
+        .replace("&deg;", "°")
         .into()
 }
 

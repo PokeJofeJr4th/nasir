@@ -63,9 +63,9 @@ impl TerminalLine {
         }
     }
 
-    pub fn check_id<T: PartialEq<RStr>>(&self, id: T) -> bool {
-        self.html_id.as_ref().map_or(false, |str| id == str.clone())
-    }
+    // pub fn check_id<T: PartialEq<RStr>>(&self, id: T) -> bool {
+    //     self.html_id.as_ref().map_or(false, |str| id == str.clone())
+    // }
 }
 
 impl From<RStr> for TerminalLine {
@@ -76,6 +76,12 @@ impl From<RStr> for TerminalLine {
             interaction_type: InteractionType::None,
             html_id: None,
         }
+    }
+}
+
+impl From<String> for TerminalLine {
+    fn from(value: String) -> Self {
+        Self::from(RStr::from(value))
     }
 }
 

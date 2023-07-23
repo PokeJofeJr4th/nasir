@@ -9,6 +9,7 @@ use crossterm::{
     execute,
     terminal::{self, disable_raw_mode, enable_raw_mode, SetTitle},
 };
+use img::{approximate_image, get_image};
 use reqwest::blocking as http;
 
 mod img;
@@ -39,37 +40,44 @@ fn main() {
 //     Ok(body)
 // }
 
-fn fetch_html(url: &str, verbose: bool) -> DocElement {
+fn fetch_html(url: &str, set_title: &mut SetTitle<RStr>, verbose: bool) -> Vec<TerminalLine> {
     let response = match http::get(url) {
         Ok(response) => response,
-        Err(err) => return DocElement::Text(format!("Network Error: {err}").into()),
+        Err(err) => return vec![TerminalLine::from(format!("Network Error: {err}"))],
     };
-    let body: String = match response.text() {
+    let bytes = response.bytes().unwrap();
+    // if we can get an image, return it
+    if let Ok(img) = get_image(&bytes) {
+        return approximate_image(
+            &img,
+            {
+                let size = terminal::size().unwrap();
+                (size.0.into(), size.1.into())
+            },
+            verbose,
+        );
+    }
+    let body: String = match String::from_utf8(bytes.to_vec()) {
         Ok(body) => body,
-        Err(err) => return DocElement::Text(format!("Network Error: {err}").into()),
+        Err(err) => return vec![TerminalLine::from(format!("Network Error: {err}"))],
     };
     if verbose {
-        println!("{body}");
+        println!("response body: {body}");
     }
     match parse_html(&body) {
-        Ok(html) => html,
-        Err(err) => DocElement::Text(format!("HTML Parsing Error: {err}").into()),
+        Ok(html) => html.display(set_title),
+        Err(err) => vec![TerminalLine::from(format!("HTML Parsing Error: {err}"))],
     }
 }
 
 fn browse(url: &str, verbose: bool) {
-    let mut set_title = SetTitle("".into());
     enable_raw_mode().unwrap();
     let mut breadcrumbs = vec![String::from(url)];
-    let fetched = fetch_html(url, verbose);
-    if verbose {
-        println!("{fetched:#?}");
-    }
-    let mut htmelements = fetched.display(&mut set_title);
+    let mut htmelements = Vec::new();
+    follow_link("", &url.into(), &mut htmelements, verbose);
     if verbose {
         println!("{htmelements:#?}");
     }
-    execute!(stdout(), set_title).unwrap();
     let mut focused = 0;
     loop {
         if htmelements.len() <= focused {
@@ -95,7 +103,7 @@ fn browse(url: &str, verbose: bool) {
                     if let Some(last) = breadcrumbs.last() {
                         follow_link(
                             &current,
-                            RStr::from(last.as_ref()),
+                            &RStr::from(last.as_ref()),
                             &mut htmelements,
                             verbose,
                         );
@@ -111,7 +119,7 @@ fn browse(url: &str, verbose: bool) {
                 KeyCode::Enter => {
                     if let InteractionType::Link(link) = htmelements[focused].interaction() {
                         let current = breadcrumbs.last().unwrap();
-                        let link = follow_link(current, link.clone(), &mut htmelements, verbose);
+                        let link = follow_link(current, &link.clone(), &mut htmelements, verbose);
                         breadcrumbs.push(String::from(&*link));
                         focused = 0;
                     }
@@ -123,22 +131,25 @@ fn browse(url: &str, verbose: bool) {
     disable_raw_mode().unwrap();
 }
 
+/// get the link destination and fetch the content on that page
 fn follow_link(
     current: &str,
-    link: RStr,
+    link: &RStr,
     htmelements: &mut Vec<TerminalLine>,
     verbose: bool,
 ) -> RStr {
     let link = get_link_destination(current, link);
-    let fetched = fetch_html(&link, verbose);
     let mut set_title = SetTitle(link.clone());
-    *htmelements = fetched.display(&mut set_title);
+    *htmelements = fetch_html(&link, &mut set_title, verbose);
+    if verbose {
+        println!("{htmelements:#?}");
+    }
     execute!(stdout(), set_title).unwrap();
     link
 }
 
 /// concatenate two links
-fn get_link_destination(current: &str, link: RStr) -> RStr {
+fn get_link_destination(current: &str, link: &RStr) -> RStr {
     if link.starts_with("//") {
         format!("https:{link}").into()
     } else if let Some(link) = link.strip_prefix('/') {
@@ -152,7 +163,7 @@ fn get_link_destination(current: &str, link: RStr) -> RStr {
         )
         .into()
     } else {
-        link
+        link.clone()
     }
 }
 
