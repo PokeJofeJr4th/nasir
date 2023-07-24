@@ -178,7 +178,8 @@ fn render_lines(lines: &[TerminalLine], focused: usize, verbose: bool) -> Vec<St
     }
     // window has to end before the end of the page
     if effective_focus + window_height > max {
-        effective_focus = max - window_height;
+        // saturating sub because it'll wrap otherwise
+        effective_focus = max.saturating_sub(window_height);
     }
     // window has to start after the start of the page
     if effective_focus < window_height {
@@ -187,7 +188,7 @@ fn render_lines(lines: &[TerminalLine], focused: usize, verbose: bool) -> Vec<St
     let start = effective_focus - window_height;
     let end = effective_focus + window_height;
     if verbose {
-        println!("showing window from {start} to {end}");
+        println!("showing window from {start} to {end}; effective focus: {effective_focus}; window height: {window_height}; max: {max}");
     }
     lines
         .iter()
