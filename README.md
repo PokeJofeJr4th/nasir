@@ -10,13 +10,19 @@ The `--release` flag is very important for performance. Some urls need to be enc
 
 ### Controls
 
-The location of your cursor is determined by the `>` on the left side of the screen. The up and down arrow keys, and j and k (like vim) move your cursor up and down. The window will automatically scroll to keep your cursor in view.
+The location of your cursor is determined by the `>` on the left side of the screen. Many of Nasir's controls are based on Vim.
+
+The up and down arrow keys, and `j` and `k` move your cursor up and down. Page up and page down will move the cursor by 10 lines at a time. The window will automatically scroll to keep your cursor in view.
 
 To follow a link, use `enter`. Some links, like those that start with `#`, don't work yet.
+
+To directly navigate to a web address, type `:` and then type the address and press enter.
 
 To go back to the previously visited page, or exit the program if you're on the first page visited, use the `esc` key.
 
 To reload the page, use the `r` key. This can be used to load images.
+
+To copy the text on the current line, use the `y` key.
 
 ### Document Elements
 

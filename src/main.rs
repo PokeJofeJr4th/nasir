@@ -2,7 +2,7 @@
 
 use core::time;
 use std::{
-    io::{stdout, Write},
+    io::{stdin, stdout, Write},
     sync::{Arc, Mutex},
 };
 
@@ -28,7 +28,7 @@ use types::prelude::*;
 #[derive(Parser)]
 struct Args {
     /// the page to visit
-    url: String,
+    url: Option<String>,
     /// print extra debug information
     #[clap(short, long)]
     verbose: bool,
@@ -36,7 +36,16 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    browse(&args.url, args.verbose);
+    browse(
+        &args.url.unwrap_or_else(|| {
+            print!("Enter URL\r\n:");
+            stdout().flush().unwrap();
+            let mut url = String::new();
+            stdin().read_line(&mut url).unwrap();
+            url
+        }),
+        args.verbose,
+    );
 }
 
 // fn fetch(url: &str) -> Result<String, reqwest::Error> {
@@ -122,9 +131,9 @@ fn browse(url: &str, verbose: bool) {
                     }
                 }
                 KeyCode::Up | KeyCode::Char('k') => focused = focused.saturating_sub(1),
-                KeyCode::PageUp => focused = focused.saturating_sub(5),
+                KeyCode::PageUp => focused = focused.saturating_sub(10),
                 KeyCode::Down | KeyCode::Char('j') => focused += 1,
-                KeyCode::PageDown => focused = focused.saturating_add(5),
+                KeyCode::PageDown => focused = focused.saturating_add(10),
                 KeyCode::Enter => {
                     if let InteractionType::Link(link) = htmelements[focused].interaction() {
                         let current = breadcrumbs.last().unwrap();
