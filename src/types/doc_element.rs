@@ -1,6 +1,14 @@
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
+};
 
-use crossterm::terminal::SetTitle;
+use crossterm::terminal::{self, SetTitle};
+
+use crate::{
+    cacher::{self, ByteCacher},
+    get_link_destination, img,
+};
 
 use super::{InteractionType, RStr, TerminalLine};
 
@@ -16,7 +24,13 @@ pub enum DocElement {
 }
 
 impl DocElement {
-    pub fn display(&self, set_title: &mut SetTitle<RStr>) -> Vec<TerminalLine> {
+    pub fn display(
+        &self,
+        set_title: &mut SetTitle<RStr>,
+        cacher: &Arc<Mutex<ByteCacher>>,
+        link: &str,
+        verbose: bool,
+    ) -> Vec<TerminalLine> {
         match self {
             Self::HtmlElement {
                 name,
@@ -37,7 +51,7 @@ impl DocElement {
                                 let title = children
                                     .iter()
                                     // get the terminal lines
-                                    .flat_map(|tl| tl.display(set_title))
+                                    .flat_map(|tl| tl.display(set_title, cacher, link, verbose))
                                     // get the text
                                     .map(|tl| tl.display(false))
                                     // make it into a string
@@ -53,20 +67,11 @@ impl DocElement {
                 }
                 // this is for elements that shouldn't display anything under them
                 "script" | "style" | "option" => Vec::new(),
-                "img" => {
-                    let alt = properties
-                        .get("alt")
-                        .map_or_else(|| properties.get("src").map_or("", |src| src), |alt| alt);
-                    if alt.is_empty() {
-                        vec![RStr::from("[image]").into()]
-                    } else {
-                        vec![RStr::from(format!("[image: {alt}]")).into()]
-                    }
-                }
+                "img" => display_img(properties, cacher, link, verbose),
                 _ => {
                     let ret: Vec<TerminalLine> = children
                         .iter()
-                        .flat_map(|tl| tl.display(set_title))
+                        .flat_map(|tl| tl.display(set_title, cacher, link, verbose))
                         .filter(|tl| !tl.is_empty())
                         .collect();
                     let ret = match &**name {
@@ -134,4 +139,49 @@ impl DocElement {
             Self::ClosingTag(_) => Self::Text(RStr::from("")),
         }
     }
+}
+
+fn display_img(
+    properties: &BTreeMap<RStr, RStr>,
+    cacher: &Arc<Mutex<ByteCacher>>,
+    base_link: &str,
+    verbose: bool,
+) -> Vec<TerminalLine> {
+    let src = properties.get("src");
+    src.and_then(|src| {
+        cacher::get_from_cache(
+            cacher.clone(),
+            &get_link_destination(base_link, src),
+            verbose,
+        )
+    })
+    .and_then(|img_bytes| {
+        // if we can get an image, return it
+        if verbose {
+            println!("`display_img` Got something from cache");
+        }
+        img::get_image(&img_bytes).map_or(None, |img| {
+            if verbose {
+                println!("The thing `display_img` got from cache worked");
+            }
+            Some(img::approximate_image(
+                &img,
+                {
+                    let size = terminal::size().unwrap();
+                    ((size.0 / 2).into(), (size.1 / 2).into())
+                },
+                verbose,
+            ))
+        })
+    })
+    .unwrap_or_else(|| {
+        let alt = properties
+            .get("alt")
+            .map_or_else(|| src.map_or("", |src| src), |alt| alt);
+        if alt.is_empty() {
+            vec![RStr::from("[image]").into()]
+        } else {
+            vec![RStr::from(format!("[image: {alt}]")).into()]
+        }
+    })
 }
