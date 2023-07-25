@@ -2,7 +2,7 @@
 
 use core::time;
 use std::{
-    io::stdout,
+    io::{stdout, Write},
     sync::{Arc, Mutex},
 };
 
@@ -11,9 +11,8 @@ use clap::Parser;
 use crossterm::{
     event::{self, KeyCode},
     execute,
-    terminal::{self, SetTitle},
+    terminal::{self, disable_raw_mode, enable_raw_mode, SetTitle},
 };
-use img::{approximate_image, get_image};
 
 mod cacher;
 mod img;
@@ -23,6 +22,7 @@ mod tests;
 mod types;
 
 use crate::parser::parse_html;
+use img::{approximate_image, get_image};
 use types::prelude::*;
 
 #[derive(Parser)]
@@ -79,7 +79,7 @@ fn fetch_html(
 }
 
 fn browse(url: &str, verbose: bool) {
-    let th = TermHandler::new();
+    let terminal_handler = TermHandler::new();
     let cacher: Arc<Mutex<ByteCacher>> = Arc::new(Mutex::new(Cacher::new()));
     let mut breadcrumbs = vec![String::from(url)];
     let mut htmelements = Vec::new();
@@ -146,12 +146,32 @@ fn browse(url: &str, verbose: bool) {
                         verbose,
                     );
                 }
+                KeyCode::Char('y') => {
+                    let content = htmelements[focused].display(false);
+                    cli_clipboard::set_contents(content).unwrap();
+                }
+                KeyCode::Char(':') => {
+                    disable_raw_mode().unwrap();
+                    print!(":");
+                    stdout().flush().unwrap();
+                    let mut response = String::new();
+                    std::io::stdin().read_line(&mut response).unwrap();
+                    enable_raw_mode().unwrap();
+                    response = response.trim().to_owned();
+                    load_link(
+                        RStr::from(response.as_ref()),
+                        &mut htmelements,
+                        &cacher,
+                        verbose,
+                    );
+                    breadcrumbs.push(response);
+                }
                 _ => {}
             }
         }
     }
     // make sure term handler lives till here
-    drop(th);
+    drop(terminal_handler);
 }
 
 /// get the link destination and fetch the content on that page
