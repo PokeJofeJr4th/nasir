@@ -81,7 +81,12 @@ fn fetch_html(
         print!("response body: {body}\r\n");
     }
     match parse_html(&body) {
-        Ok(html) => html.display(set_title, cacher, url, verbose),
+        Ok(html) => {
+            if verbose {
+                print!("Parsed HTML: {html:#?}");
+            }
+            html.display(set_title, cacher, url, verbose)
+        }
         Err(err) => vec![TerminalLine::from(format!("HTML Parsing Error: {err}"))],
     }
 }
@@ -96,7 +101,7 @@ fn browse(url: &str, verbose: bool) {
         print!("{htmelements:#?}\r\n");
     }
     let mut focused = 0;
-    loop {
+    'browsing: loop {
         if htmelements.len() <= focused {
             focused = htmelements.len() - 1;
         }
@@ -127,7 +132,7 @@ fn browse(url: &str, verbose: bool) {
                             );
                             focused = 0;
                         } else {
-                            break;
+                            break 'browsing;
                         }
                     }
                     KeyCode::Up | KeyCode::Char('k') => focused = focused.saturating_sub(1),

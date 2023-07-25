@@ -8,6 +8,7 @@ use crossterm::terminal::{self, SetTitle};
 use crate::{
     cacher::{self, ByteCacher},
     get_link_destination, img,
+    utils::wrap,
 };
 
 use super::{InteractionType, RStr, TerminalLine};
@@ -111,7 +112,10 @@ impl DocElement {
                     }
                 }
             },
-            Self::Text(txt) => vec![txt.clone().into()],
+            Self::Text(txt) => wrap(txt, (terminal::size().unwrap().0 - 1) as usize)
+                .into_iter()
+                .map(|str| TerminalLine::from(&str[1..]))
+                .collect(),
             Self::ClosingTag(_) => vec![RStr::from("").into()],
         }
     }

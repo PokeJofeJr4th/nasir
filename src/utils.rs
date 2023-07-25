@@ -70,17 +70,44 @@ pub fn transform_text(input: &str) -> RStr {
 }
 
 /// transform rgb values to 8-bit colors
-/// 
+///
 /// source: <https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797>
 #[allow(clippy::cast_possible_truncation)]
 pub const fn rgb_to_256((r, g, b): (usize, usize, usize)) -> u8 {
-    let (r, g, b) = (((r * 3) >> 7) as u8, ((g * 3) >> 7) as u8, ((b * 3) >> 7) as u8);
+    let (r, g, b) = (
+        ((r * 3) >> 7) as u8,
+        ((g * 3) >> 7) as u8,
+        ((b * 3) >> 7) as u8,
+    );
     ((r * 36) + (g * 6) + b) + 16
+}
+
+pub fn wrap(txt: &str, width: usize) -> Vec<String> {
+    let mut lines_buf = Vec::new();
+    let mut current_line_buf = String::new();
+    for w in txt.split_whitespace() {
+        if w.len() >= width {
+            if !current_line_buf.is_empty() {
+                lines_buf.push(core::mem::take(&mut current_line_buf));
+            }
+            lines_buf.push(String::from(w));
+            continue;
+        }
+        if current_line_buf.len() + w.len() >= width {
+            lines_buf.push(core::mem::take(&mut current_line_buf));
+        }
+        current_line_buf.push(' ');
+        current_line_buf.push_str(w);
+    }
+    if !current_line_buf.is_empty() {
+        lines_buf.push(current_line_buf);
+    }
+    lines_buf
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{get_link_destination, transform_text, rgb_to_256};
+    use super::{get_link_destination, rgb_to_256, transform_text};
 
     #[test]
     fn transform() {

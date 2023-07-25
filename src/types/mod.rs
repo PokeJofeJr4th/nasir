@@ -12,7 +12,7 @@ pub mod prelude {
 
     pub type RStr = Rc<str>;
 
-    pub const SELF_CLOSING_TAGS: &[&str] = &["meta", "link", "image", "input"];
+    pub const SELF_CLOSING_TAGS: &[&str] = &["meta", "link", "image", "input", "img"];
 }
 
 mod terminal_handler {

@@ -85,6 +85,12 @@ impl From<String> for TerminalLine {
     }
 }
 
+impl From<&str> for TerminalLine {
+    fn from(value: &str) -> Self {
+        Self::from(RStr::from(value))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InteractionType {
     // Input(String),
