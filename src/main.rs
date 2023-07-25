@@ -17,11 +17,10 @@ use crossterm::{
 mod cacher;
 mod img;
 mod parser;
-#[cfg(test)]
-mod tests;
 mod types;
+mod utils;
 
-use crate::parser::parse_html;
+use crate::{parser::parse_html, utils::get_link_destination};
 use img::{approximate_image, get_image};
 use types::prelude::*;
 
@@ -197,25 +196,6 @@ fn load_link(
     }
     execute!(stdout(), set_title).unwrap();
     link
-}
-
-/// concatenate two links
-fn get_link_destination(current: &str, link: &RStr) -> RStr {
-    if link.starts_with("//") {
-        format!("https:{link}").into()
-    } else if let Some(link) = link.strip_prefix('/') {
-        format!(
-            "{}{link}",
-            &current
-                .split('/')
-                .take(3)
-                .map(|s| format!("{s}/"))
-                .collect::<String>()
-        )
-        .into()
-    } else {
-        link.clone()
-    }
 }
 
 /// print out the lines out of a parsed html
