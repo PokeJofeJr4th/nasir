@@ -8,6 +8,7 @@ use reqwest::blocking as http;
 use tokio::runtime::Builder as TokioBuilder;
 use tokio::runtime::Runtime as TokioRuntime;
 
+#[allow(clippy::module_name_repetitions)]
 pub type ByteCacher = Cacher<Vec<u8>>;
 
 pub struct Cacher<T> {

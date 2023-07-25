@@ -39,14 +39,17 @@ pub fn approximate_image(
         let mut current_line = String::new();
         for col in 0..term_width {
             let col_iter = (col * img_width / term_width)
-                ..=(((col + 1) * img_width / term_width).min(img_height - 1));
+                ..=(((col + 1) * img_width / term_width).min(img_width - 1));
+            if verbose {
+                print!("image columns: {col_iter:?}\r\n");
+            }
             let mut pixels_in_chunk = Vec::new();
             for y in row_iter.clone() {
                 for x in col_iter.clone() {
                     pixels_in_chunk.push(img.get_pixel(x, y).channels());
                 }
             }
-            let pix_len = pixels_in_chunk.len();
+            let pix_len = pixels_in_chunk.len().max(1);
             let (mut r, mut g, mut b) = (0, 0, 0);
             for px in pixels_in_chunk {
                 r += px[0] as usize * px[3] as usize / 256;

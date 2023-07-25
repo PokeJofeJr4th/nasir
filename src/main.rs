@@ -11,7 +11,7 @@ use clap::Parser;
 use crossterm::{
     event::{self, KeyCode},
     execute,
-    terminal::{self, disable_raw_mode, enable_raw_mode, SetTitle},
+    terminal::{self, SetTitle},
 };
 use img::{approximate_image, get_image};
 
@@ -121,10 +121,10 @@ fn browse(url: &str, verbose: bool) {
                         break;
                     }
                 }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    focused = focused.saturating_sub(1);
-                }
+                KeyCode::Up | KeyCode::Char('k') => focused = focused.saturating_sub(1),
+                KeyCode::PageUp => focused = focused.saturating_sub(5),
                 KeyCode::Down | KeyCode::Char('j') => focused += 1,
+                KeyCode::PageDown => focused = focused.saturating_add(5),
                 KeyCode::Enter => {
                     if let InteractionType::Link(link) = htmelements[focused].interaction() {
                         let current = breadcrumbs.last().unwrap();
