@@ -79,7 +79,7 @@ fn fetch_html(
 }
 
 fn browse(url: &str, verbose: bool) {
-    enable_raw_mode().unwrap();
+    let th = TermHandler::new();
     let cacher: Arc<Mutex<ByteCacher>> = Arc::new(Mutex::new(Cacher::new()));
     let mut breadcrumbs = vec![String::from(url)];
     let mut htmelements = Vec::new();
@@ -150,7 +150,8 @@ fn browse(url: &str, verbose: bool) {
             }
         }
     }
-    disable_raw_mode().unwrap();
+    // make sure term handler lives till here
+    drop(th);
 }
 
 /// get the link destination and fetch the content on that page
