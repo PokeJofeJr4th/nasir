@@ -69,9 +69,18 @@ pub fn transform_text(input: &str) -> RStr {
         .into()
 }
 
+/// transform rgb values to 8-bit colors
+/// 
+/// source: <https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797>
+#[allow(clippy::cast_possible_truncation)]
+pub const fn rgb_to_256((r, g, b): (usize, usize, usize)) -> u8 {
+    let (r, g, b) = (((r * 3) >> 7) as u8, ((g * 3) >> 7) as u8, ((b * 3) >> 7) as u8);
+    ((r * 36) + (g * 6) + b) + 16
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{get_link_destination, transform_text};
+    use super::{get_link_destination, transform_text, rgb_to_256};
 
     #[test]
     fn transform() {
@@ -86,5 +95,10 @@ mod tests {
             get_link_destination("https://docs.rs/releases/2", &"/releases/3".into()),
             "https://docs.rs/releases/3".into()
         );
+    }
+
+    #[test]
+    fn colors() {
+        assert_eq!(rgb_to_256((0, 0, 0)), 16);
     }
 }

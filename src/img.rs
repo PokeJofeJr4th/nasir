@@ -4,6 +4,7 @@ use image::io::Reader as ImageReader;
 use image::{Pixel, RgbaImage};
 
 use crate::types::TerminalLine;
+use crate::utils::rgb_to_256;
 
 /// get an image from the byte stream
 pub fn get_image(bytes: &[u8]) -> Result<RgbaImage, String> {
@@ -57,7 +58,11 @@ pub fn approximate_image(
                 b += px[2] as usize * px[3] as usize / 256;
             }
             let (r, g, b) = (r / pix_len, g / pix_len, b / pix_len);
-            current_line.push_str(&format!("\x1b[38;2;{r};{g};{b}m█\x1b[0m"));
+            current_line.push_str(&format!(
+                "\x1b[38;5;{};38;2;{r};{g};{b}m█\x1b[0m",
+                // "\x1b[38;5;{}m█\x1b[0m",
+                rgb_to_256((r, g, b))
+            ));
         }
         termlines.push(TerminalLine::from(current_line));
     }

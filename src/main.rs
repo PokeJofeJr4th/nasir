@@ -108,73 +108,75 @@ fn browse(url: &str, verbose: bool) {
             print!("{l}\r\n");
         }
         while matches!(event::poll(time::Duration::from_secs(0)), Ok(false)) {}
-        if let Ok(event::Event::Key(event::KeyEvent {
-            code,
-            kind: event::KeyEventKind::Press,
-            ..
-        })) = event::read()
-        {
-            match code {
-                KeyCode::Esc => {
-                    let current = breadcrumbs.pop().unwrap();
-                    if let Some(last) = breadcrumbs.last() {
+        while matches!(event::poll(time::Duration::from_secs(0)), Ok(true)) {
+            if let Ok(event::Event::Key(event::KeyEvent {
+                code,
+                kind: event::KeyEventKind::Press,
+                ..
+            })) = event::read()
+            {
+                match code {
+                    KeyCode::Esc => {
+                        let current = breadcrumbs.pop().unwrap();
+                        if let Some(last) = breadcrumbs.last() {
+                            load_link(
+                                get_link_destination(&current, &RStr::from(last.as_ref())),
+                                &mut htmelements,
+                                &cacher,
+                                verbose,
+                            );
+                            focused = 0;
+                        } else {
+                            break;
+                        }
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => focused = focused.saturating_sub(1),
+                    KeyCode::PageUp => focused = focused.saturating_sub(10),
+                    KeyCode::Down | KeyCode::Char('j') => focused += 1,
+                    KeyCode::PageDown => focused = focused.saturating_add(10),
+                    KeyCode::Enter => {
+                        if let InteractionType::Link(link) = htmelements[focused].interaction() {
+                            let current = breadcrumbs.last().unwrap();
+                            let link = load_link(
+                                get_link_destination(current, link),
+                                &mut htmelements,
+                                &cacher,
+                                verbose,
+                            );
+                            breadcrumbs.push(String::from(&*link));
+                            focused = 0;
+                        }
+                    }
+                    KeyCode::Char('r') => {
                         load_link(
-                            get_link_destination(&current, &RStr::from(last.as_ref())),
+                            RStr::from(breadcrumbs.last().unwrap().as_ref()),
                             &mut htmelements,
                             &cacher,
                             verbose,
                         );
-                        focused = 0;
-                    } else {
-                        break;
                     }
-                }
-                KeyCode::Up | KeyCode::Char('k') => focused = focused.saturating_sub(1),
-                KeyCode::PageUp => focused = focused.saturating_sub(10),
-                KeyCode::Down | KeyCode::Char('j') => focused += 1,
-                KeyCode::PageDown => focused = focused.saturating_add(10),
-                KeyCode::Enter => {
-                    if let InteractionType::Link(link) = htmelements[focused].interaction() {
-                        let current = breadcrumbs.last().unwrap();
-                        let link = load_link(
-                            get_link_destination(current, link),
+                    KeyCode::Char('y') => {
+                        let content = htmelements[focused].display(false);
+                        cli_clipboard::set_contents(content).unwrap();
+                    }
+                    KeyCode::Char(':') => {
+                        disable_raw_mode().unwrap();
+                        print!(":");
+                        stdout().flush().unwrap();
+                        let mut response = String::new();
+                        std::io::stdin().read_line(&mut response).unwrap();
+                        enable_raw_mode().unwrap();
+                        response = response.trim().to_owned();
+                        load_link(
+                            RStr::from(response.as_ref()),
                             &mut htmelements,
                             &cacher,
                             verbose,
                         );
-                        breadcrumbs.push(String::from(&*link));
-                        focused = 0;
+                        breadcrumbs.push(response);
                     }
+                    _ => {}
                 }
-                KeyCode::Char('r') => {
-                    load_link(
-                        RStr::from(breadcrumbs.last().unwrap().as_ref()),
-                        &mut htmelements,
-                        &cacher,
-                        verbose,
-                    );
-                }
-                KeyCode::Char('y') => {
-                    let content = htmelements[focused].display(false);
-                    cli_clipboard::set_contents(content).unwrap();
-                }
-                KeyCode::Char(':') => {
-                    disable_raw_mode().unwrap();
-                    print!(":");
-                    stdout().flush().unwrap();
-                    let mut response = String::new();
-                    std::io::stdin().read_line(&mut response).unwrap();
-                    enable_raw_mode().unwrap();
-                    response = response.trim().to_owned();
-                    load_link(
-                        RStr::from(response.as_ref()),
-                        &mut htmelements,
-                        &cacher,
-                        verbose,
-                    );
-                    breadcrumbs.push(response);
-                }
-                _ => {}
             }
         }
     }
