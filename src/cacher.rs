@@ -80,7 +80,7 @@ pub fn get_from_cache(cache: Arc<Mutex<ByteCacher>>, key: &str, verbose: bool) -
             cache.clone().lock().unwrap().thread_pool.spawn(async move {
                 // get the value from the interwebs. If it works, this is the Stored value. If there's an error, make it empty
                 if verbose {
-                    println!("Closure Starting: get bytes from {key}");
+                    print!("Closure Starting: get bytes from {key}\r\n");
                 }
                 let value = http::get(&key)
                     .map_or(None, |response| response.bytes().ok())
@@ -88,7 +88,7 @@ pub fn get_from_cache(cache: Arc<Mutex<ByteCacher>>, key: &str, verbose: bool) -
                         InternalCacheState::Stored(response.to_vec())
                     });
                 if verbose {
-                    println!("Got Value: {value:?}");
+                    print!("Got Value: {value:?}\r\n");
                 }
                 cache.lock().unwrap().inner.insert(key, value);
             });

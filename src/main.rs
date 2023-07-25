@@ -70,7 +70,7 @@ fn fetch_html(
         Err(err) => return vec![TerminalLine::from(format!("Network Error: {err}"))],
     };
     if verbose {
-        println!("response body: {body}");
+        print!("response body: {body}\r\n");
     }
     match parse_html(&body) {
         Ok(html) => html.display(set_title, cacher, url, verbose),
@@ -85,7 +85,7 @@ fn browse(url: &str, verbose: bool) {
     let mut htmelements = Vec::new();
     load_link(url.into(), &mut htmelements, &cacher, verbose);
     if verbose {
-        println!("{htmelements:#?}");
+        print!("{htmelements:#?}\r\n");
     }
     let mut focused = 0;
     loop {
@@ -94,10 +94,10 @@ fn browse(url: &str, verbose: bool) {
         }
         let lines = render_lines(&htmelements, focused, verbose);
         // clear the screen
-        println!("\x1B[2J\x1B[1;1H");
+        print!("\x1B[2J\x1B[1;1H");
         // print out the current window
         for l in lines {
-            println!("{l}");
+            print!("{l}\r\n");
         }
         while matches!(event::poll(time::Duration::from_secs(0)), Ok(false)) {}
         if let Ok(event::Event::Key(event::KeyEvent {
@@ -163,7 +163,7 @@ fn load_link(
     let mut set_title = SetTitle(link.clone());
     *htmelements = fetch_html(&link, &mut set_title, cacher, verbose);
     if verbose {
-        println!("{htmelements:#?}");
+        print!("{htmelements:#?}\r\n");
     }
     execute!(stdout(), set_title).unwrap();
     link
@@ -209,7 +209,7 @@ fn render_lines(lines: &[TerminalLine], focused: usize, verbose: bool) -> Vec<St
     let start = effective_focus - window_height;
     let end = effective_focus + window_height;
     if verbose {
-        println!("showing window from {start} to {end}; effective focus: {effective_focus}; window height: {window_height}; max: {max}");
+        print!("showing window from {start} to {end}; effective focus: {effective_focus}; window height: {window_height}; max: {max}\r\n");
     }
     lines
         .iter()

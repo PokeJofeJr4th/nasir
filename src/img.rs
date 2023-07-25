@@ -34,7 +34,7 @@ pub fn approximate_image(
         let row_iter = (row * img_height / term_height)
             ..=(((row + 1) * img_height / term_height).min(img_height - 1));
         if verbose {
-            println!("image rows: {row_iter:?}");
+            print!("image rows: {row_iter:?}\r\n");
         }
         let mut current_line = String::new();
         for col in 0..term_width {

@@ -158,11 +158,11 @@ fn display_img(
     .and_then(|img_bytes| {
         // if we can get an image, return it
         if verbose {
-            println!("`display_img` Got something from cache");
+            print!("`display_img` Got something from cache\r\n");
         }
         img::get_image(&img_bytes).map_or(None, |img| {
             if verbose {
-                println!("The thing `display_img` got from cache worked");
+                print!("The thing `display_img` got from cache worked\r\n");
             }
             Some(img::approximate_image(
                 &img,
