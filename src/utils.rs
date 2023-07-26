@@ -1,4 +1,4 @@
-//! Pure functions used in Nasir
+//! Small pure functions used in Nasir
 
 use crate::types::RStr;
 use lazy_regex::lazy_regex;
@@ -6,6 +6,8 @@ use lazy_regex::lazy_regex;
 pub fn get_link_destination(current: &str, link: &RStr) -> RStr {
     if link.starts_with("//") {
         format!("https:{link}").into()
+    } else if link.starts_with('#') {
+        format!("{current}{link}").into()
     } else if let Some(link) = link.strip_prefix('/') {
         format!(
             "{}{link}",
@@ -16,6 +18,10 @@ pub fn get_link_destination(current: &str, link: &RStr) -> RStr {
                 .collect::<String>()
         )
         .into()
+    } else if let Some(link) = link.strip_prefix("..") {
+        todo!("This is a backtracked relative link")
+    } else if !link.contains('.') {
+        todo!("This is a relative link")
     } else {
         link.clone()
     }

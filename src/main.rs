@@ -13,6 +13,7 @@ use crossterm::{
     execute,
     terminal::{self, disable_raw_mode, enable_raw_mode, SetTitle},
 };
+use lazy_regex::lazy_regex;
 
 mod cacher;
 mod img;
@@ -120,73 +121,98 @@ fn browse(url: &str, verbose: bool) {
                 ..
             })) = event::read()
             {
-                match code {
-                    KeyCode::Esc => {
-                        let current = breadcrumbs.pop().unwrap();
-                        if let Some(last) = breadcrumbs.last() {
-                            load_link(
-                                get_link_destination(&current, &RStr::from(last.as_ref())),
-                                &mut htmelements,
-                                &cacher,
-                                verbose,
-                            );
-                            focused = 0;
-                        } else {
-                            break 'browsing;
-                        }
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => focused = focused.saturating_sub(1),
-                    KeyCode::PageUp => focused = focused.saturating_sub(10),
-                    KeyCode::Down | KeyCode::Char('j') => focused += 1,
-                    KeyCode::PageDown => focused = focused.saturating_add(10),
-                    KeyCode::Enter => {
-                        if let InteractionType::Link(link) = htmelements[focused].interaction() {
-                            let current = breadcrumbs.last().unwrap();
-                            let link = load_link(
-                                get_link_destination(current, link),
-                                &mut htmelements,
-                                &cacher,
-                                verbose,
-                            );
-                            breadcrumbs.push(String::from(&*link));
-                            focused = 0;
-                        }
-                    }
-                    KeyCode::Char('r') => {
-                        load_link(
-                            RStr::from(breadcrumbs.last().unwrap().as_ref()),
-                            &mut htmelements,
-                            &cacher,
-                            verbose,
-                        );
-                    }
-                    KeyCode::Char('y') => {
-                        let content = htmelements[focused].display(false);
-                        cli_clipboard::set_contents(content).unwrap();
-                    }
-                    KeyCode::Char(':') => {
-                        disable_raw_mode().unwrap();
-                        print!(":");
-                        stdout().flush().unwrap();
-                        let mut response = String::new();
-                        std::io::stdin().read_line(&mut response).unwrap();
-                        enable_raw_mode().unwrap();
-                        response = response.trim().to_owned();
-                        load_link(
-                            RStr::from(response.as_ref()),
-                            &mut htmelements,
-                            &cacher,
-                            verbose,
-                        );
-                        breadcrumbs.push(response);
-                    }
-                    _ => {}
+                if browser_key_event(
+                    code,
+                    &mut breadcrumbs,
+                    &mut htmelements,
+                    &cacher,
+                    verbose,
+                    &mut focused,
+                ) {
+                    break 'browsing;
                 }
             }
         }
     }
     // make sure term handler lives till here
     drop(terminal_handler);
+}
+
+/// handle a key press event
+fn browser_key_event(
+    code: KeyCode,
+    breadcrumbs: &mut Vec<String>,
+    htmelements: &mut Vec<TerminalLine>,
+    cacher: &Arc<Mutex<ByteCacher>>,
+    verbose: bool,
+    focused: &mut usize,
+) -> bool {
+    match code {
+        KeyCode::Esc => {
+            let current = breadcrumbs.pop().unwrap();
+            if let Some(last) = breadcrumbs.last() {
+                load_link(
+                    get_link_destination(&current, &RStr::from(last.as_ref())),
+                    htmelements,
+                    cacher,
+                    verbose,
+                );
+                *focused = 0;
+            } else {
+                return true;
+            }
+        }
+        KeyCode::Up | KeyCode::Char('k') => *focused = focused.saturating_sub(1),
+        KeyCode::PageUp => *focused = focused.saturating_sub(10),
+        KeyCode::Down | KeyCode::Char('j') => *focused += 1,
+        KeyCode::PageDown => *focused = focused.saturating_add(10),
+        KeyCode::Enter => {
+            if let InteractionType::Link(link) = htmelements[*focused].interaction() {
+                let current = breadcrumbs.last().unwrap();
+                let link = load_link(
+                    get_link_destination(current, link),
+                    htmelements,
+                    cacher,
+                    verbose,
+                );
+                breadcrumbs.push(String::from(&*link));
+                *focused = lazy_regex!("#([\\w_-]*)$")
+                    .captures(&link)
+                    .map_or(0, |captures| {
+                        let id = captures.get(1).unwrap().as_str();
+                        htmelements
+                            .iter()
+                            .position(|tl| tl.check_id(id))
+                            .unwrap_or(0)
+                    });
+            }
+        }
+        KeyCode::Char('r') => {
+            load_link(
+                RStr::from(breadcrumbs.last().unwrap().as_ref()),
+                htmelements,
+                cacher,
+                verbose,
+            );
+        }
+        KeyCode::Char('y') => {
+            let content = htmelements[*focused].display(false);
+            cli_clipboard::set_contents(content).unwrap();
+        }
+        KeyCode::Char(':') => {
+            disable_raw_mode().unwrap();
+            print!(":");
+            stdout().flush().unwrap();
+            let mut response = String::new();
+            std::io::stdin().read_line(&mut response).unwrap();
+            enable_raw_mode().unwrap();
+            response = response.trim().to_owned();
+            load_link(RStr::from(response.as_ref()), htmelements, cacher, verbose);
+            breadcrumbs.push(response);
+        }
+        _ => {}
+    }
+    false
 }
 
 /// get the link destination and fetch the content on that page
@@ -205,7 +231,7 @@ fn load_link(
     link
 }
 
-/// print out the lines out of a parsed html
+/// near-pure fn to convert a list of terminal lines to a list of strings within a window
 fn render_lines(lines: &[TerminalLine], focused: usize, verbose: bool) -> Vec<String> {
     let mut effective_focus = focused;
     let window_height = terminal::size().unwrap().1 as usize / 2 - 1;

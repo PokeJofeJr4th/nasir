@@ -23,7 +23,8 @@ mod terminal_handler {
         terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     };
 
-    // DO NOT copy or clone
+    /// Handles raw mode and alt screen
+    /// DO NOT copy or clone
     pub struct TermHandler;
 
     impl TermHandler {

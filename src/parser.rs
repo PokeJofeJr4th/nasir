@@ -5,6 +5,7 @@ use crate::{
     utils::transform_text,
 };
 
+/// pure fn to convert text data to html
 pub fn parse_html(html: &str) -> Result<DocElement, String> {
     let mut chars = if html.to_lowercase().starts_with("<!doctype html>") {
         &html[15..]

@@ -28,6 +28,7 @@ impl<T> Cacher<T> {
         }
     }
 
+    /// pure fn to tell what state the cache is in
     fn get_state(&self, key: &str) -> InternalCacheState<()> {
         match self.inner.get(key) {
             Some(InternalCacheState::Stored(_)) => InternalCacheState::Stored(()),
@@ -36,6 +37,7 @@ impl<T> Cacher<T> {
         }
     }
 
+    /// pure fn to get a reference to the cache's internal state
     fn get(&self, key: &str) -> &InternalCacheState<T> {
         self.inner
             .get(key)
@@ -43,7 +45,7 @@ impl<T> Cacher<T> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 enum InternalCacheState<T> {
     /// there's a stored value
     Stored(T),
@@ -54,6 +56,7 @@ enum InternalCacheState<T> {
 }
 
 impl<T> InternalCacheState<T> {
+    /// pure fn to convert to an option for if the state contains data
     #[allow(clippy::missing_const_for_fn)]
     fn try_stored(self) -> Option<T> {
         match self {
@@ -83,10 +86,9 @@ pub fn get_from_cache(cache: Arc<Mutex<ByteCacher>>, key: &str, verbose: bool) -
                 if verbose {
                     print!("Closure Starting: get bytes from {key}\r\n");
                 }
-                let value = http::get(&key)
-                    .map_or(None, |response| response.bytes().ok())
-                    .map_or(InternalCacheState::Empty, |response| {
-                        InternalCacheState::Stored(response.to_vec())
+                let value = get_from_cache_blocking(&cache, &key)
+                    .map_or(InternalCacheState::Empty, |vec| {
+                        InternalCacheState::Stored(vec)
                     });
                 if verbose {
                     print!("Got Value: {value:?}\r\n");
@@ -115,6 +117,8 @@ pub fn get_from_cache_blocking(
             .ok_or_else(|| String::from("Internal Cache Error"))
     } else {
         let res = http::get(key)
+            .or_else(|_| http::get(format!("https://{key}")))
+            .or_else(|_| http::get(format!("https://www.{key}")))
             .map_err(|err| format!("Network Error: {err}"))?
             .bytes()
             .map_err(|err| format!("Decoding Error: {err}"))?

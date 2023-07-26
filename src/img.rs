@@ -6,7 +6,7 @@ use image::{Pixel, RgbaImage};
 use crate::types::TerminalLine;
 use crate::utils::rgb_to_256;
 
-/// get an image from the byte stream
+/// pure function to get an image from the byte stream
 pub fn get_image(bytes: &[u8]) -> Result<RgbaImage, String> {
     let img = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()

@@ -1,4 +1,5 @@
 use std::{
+    cmp::max,
     collections::BTreeMap,
     sync::{Arc, Mutex},
 };
@@ -90,6 +91,7 @@ impl DocElement {
         }
     }
 
+    /// pure function to collapse some elements and so on
     pub fn minify(self) -> Self {
         match self {
             Self::HtmlElement {
@@ -115,6 +117,7 @@ impl DocElement {
     }
 }
 
+/// pure function to apply special formatting to the output of `DocElement::display`
 fn display_formatted_element(
     name: &str,
     properties: &BTreeMap<RStr, RStr>,
@@ -153,7 +156,7 @@ fn display_formatted_element(
         "code" => {
             let width = ret
                 .iter()
-                .map(|tl| tl.display(false).len())
+                .map(|tl| max(tl.display(false).len(), tl.display(true).len()) - 1)
                 .max()
                 .unwrap_or(0);
             ret.into_iter()
@@ -165,7 +168,7 @@ fn display_formatted_element(
         "h1" => {
             let width = ret
                 .iter()
-                .map(|tl| tl.display(false).len() - 1)
+                .map(|tl| max(tl.display(false).len(), tl.display(true).len()) - 1)
                 .max()
                 .unwrap_or(0);
             let mut buf = vec![TerminalLine::from(format!("╔{:═<width$}╗", ""))];
@@ -179,7 +182,7 @@ fn display_formatted_element(
         "h2" => {
             let width = ret
                 .iter()
-                .map(|tl| tl.display(false).len() - 1)
+                .map(|tl| max(tl.display(false).len(), tl.display(true).len()) - 1)
                 .max()
                 .unwrap_or(0);
             let mut buf = vec![TerminalLine::from(format!("╔{:═<width$}╗", ""))];
@@ -193,7 +196,7 @@ fn display_formatted_element(
         "h3" => {
             let width = ret
                 .iter()
-                .map(|tl| tl.display(false).len() - 1)
+                .map(|tl| max(tl.display(false).len(), tl.display(true).len()) - 1)
                 .max()
                 .unwrap_or(0);
             let mut buf = vec![TerminalLine::from(format!("┌{:─<width$}┐", ""))];
