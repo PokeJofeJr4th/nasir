@@ -75,56 +75,7 @@ impl DocElement {
                         .flat_map(|tl| tl.display(set_title, cacher, link, verbose))
                         .filter(|tl| !tl.is_empty())
                         .collect();
-                    let ret = match &**name {
-                        "a" => {
-                            let href: RStr = properties.get("href").map_or("".into(), Clone::clone);
-                            ret.into_iter()
-                                .map(|content| {
-                                    // if it's already a link, prefer the lower-level one
-                                    if let InteractionType::Link(_) = content.interaction() {
-                                        content
-                                    } else {
-                                        content
-                                            // >(text)[link] when focused
-                                            .map_focused(|str| {
-                                                format!("({str})[\x1b[94m{href}\x1b[0m]").into()
-                                            })
-                                            // blue underlined link when unfocused
-                                            .map_unfocused(|str| {
-                                                format!("\x1b[4;94m{str}\x1b[0m").into()
-                                            })
-                                            .with_interaction(InteractionType::Link(href.clone()))
-                                    }
-                                })
-                                .collect()
-                        }
-                        // bold font face
-                        "b" | "strong" => ret
-                            .into_iter()
-                            .map(|tl| tl.map(|rstr| format!("\x1b[1m{rstr}\x1b[0m").into()))
-                            .collect(),
-                        // light font face
-                        "i" => ret
-                            .into_iter()
-                            .map(|tl| tl.map(|rstr| format!("\x1b[1m{rstr}\x1b[0m").into()))
-                            .collect(),
-                        "code" => {
-                            let width = ret
-                                .iter()
-                                .map(|tl| tl.display(false).len())
-                                .max()
-                                .unwrap_or(0);
-                            ret.into_iter()
-                                .map(|tl| {
-                                    tl.map(|rstr| {
-                                        format!("\x1b[38;5;250;48;5;240m{rstr:width$}\x1b[0m")
-                                            .into()
-                                    })
-                                })
-                                .collect()
-                        }
-                        _ => ret,
-                    };
+                    let ret = display_formatted_element(name, properties, ret);
                     match properties.get("id") {
                         Some(id) => ret.into_iter().map(|tl| tl.with_id(id.clone())).collect(),
                         None => ret,
@@ -161,6 +112,111 @@ impl DocElement {
             Self::Text(txt) => Self::Text(RStr::from(txt.trim())),
             Self::ClosingTag(_) => Self::Text(RStr::from("")),
         }
+    }
+}
+
+fn display_formatted_element(
+    name: &str,
+    properties: &BTreeMap<RStr, RStr>,
+    ret: Vec<TerminalLine>,
+) -> Vec<TerminalLine> {
+    match name {
+        "a" => {
+            let href: RStr = properties.get("href").map_or("".into(), Clone::clone);
+            ret.into_iter()
+                .map(|content| {
+                    // if it's already a link, prefer the lower-level one
+                    if let InteractionType::Link(_) = content.interaction() {
+                        content
+                    } else {
+                        content
+                            // >(text)[link] when focused
+                            .map_focused(|str| format!("({str})[\x1b[94m{href}\x1b[0m]").into())
+                            // blue underlined link when unfocused
+                            .map_unfocused(|str| format!("\x1b[4;94m{str}\x1b[0m").into())
+                            .with_interaction(InteractionType::Link(href.clone()))
+                    }
+                })
+                .collect()
+        }
+        // bold font face
+        "b" | "strong" => ret
+            .into_iter()
+            .map(|tl| tl.map(|rstr| format!("\x1b[1m{rstr}\x1b[0m").into()))
+            .collect(),
+        // light font face
+        "i" => ret
+            .into_iter()
+            .map(|tl| tl.map(|rstr| format!("\x1b[1m{rstr}\x1b[0m").into()))
+            .collect(),
+        // get max width, dull colors for code blocks
+        "code" => {
+            let width = ret
+                .iter()
+                .map(|tl| tl.display(false).len())
+                .max()
+                .unwrap_or(0);
+            ret.into_iter()
+                .map(|tl| {
+                    tl.map(|rstr| format!("\x1b[38;5;250;48;5;240m{rstr:width$}\x1b[0m").into())
+                })
+                .collect()
+        }
+        "h1" => {
+            let width = ret
+                .iter()
+                .map(|tl| tl.display(false).len() - 1)
+                .max()
+                .unwrap_or(0);
+            let mut buf = vec![TerminalLine::from(format!("╔{:═<width$}╗", ""))];
+            buf.extend(
+                ret.into_iter()
+                    .map(|tl| tl.map(|rstr| format!("║\x1b[30;47m{rstr:width$}\x1b[0m║").into())),
+            );
+            buf.push(TerminalLine::from(format!("╚{:═<width$}╝", "")));
+            buf
+        }
+        "h2" => {
+            let width = ret
+                .iter()
+                .map(|tl| tl.display(false).len() - 1)
+                .max()
+                .unwrap_or(0);
+            let mut buf = vec![TerminalLine::from(format!("╔{:═<width$}╗", ""))];
+            buf.extend(
+                ret.into_iter()
+                    .map(|tl| tl.map(|rstr| format!("║{rstr:width$}║").into())),
+            );
+            buf.push(TerminalLine::from(format!("╚{:═<width$}╝", "")));
+            buf
+        }
+        "h3" => {
+            let width = ret
+                .iter()
+                .map(|tl| tl.display(false).len() - 1)
+                .max()
+                .unwrap_or(0);
+            let mut buf = vec![TerminalLine::from(format!("┌{:─<width$}┐", ""))];
+            buf.extend(
+                ret.into_iter()
+                    .map(|tl| tl.map(|rstr| format!("│{rstr:width$}│").into())),
+            );
+            buf.push(TerminalLine::from(format!("└{:─<width$}┘", "")));
+            buf
+        }
+        "h4" => ret
+            .into_iter()
+            .map(|tl| tl.map(|rstr| format!("\x1b[30;47m{rstr}\x1b[0m").into()))
+            .collect(),
+        "h5" => ret
+            .into_iter()
+            .map(|tl| tl.map(|rstr| format!("#### {rstr} ####").into()))
+            .collect(),
+        "h6" => ret
+            .into_iter()
+            .map(|tl| tl.map(|rstr| format!("## {rstr} ##").into()))
+            .collect(),
+        _ => ret,
     }
 }
 
