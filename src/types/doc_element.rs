@@ -85,9 +85,11 @@ impl DocElement {
                                         content
                                     } else {
                                         content
+                                            // >(text)[link] when focused
                                             .map_focused(|str| {
                                                 format!("({str})[\x1b[94m{href}\x1b[0m]").into()
                                             })
+                                            // blue underlined link when unfocused
                                             .map_unfocused(|str| {
                                                 format!("\x1b[4;94m{str}\x1b[0m").into()
                                             })
@@ -96,14 +98,31 @@ impl DocElement {
                                 })
                                 .collect()
                         }
+                        // bold font face
                         "b" | "strong" => ret
                             .into_iter()
                             .map(|tl| tl.map(|rstr| format!("\x1b[1m{rstr}\x1b[0m").into()))
                             .collect(),
+                        // light font face
                         "i" => ret
                             .into_iter()
-                            .map(|tl| tl.map(|rstr| format!("\x3b[1m{rstr}\x1b[0m").into()))
+                            .map(|tl| tl.map(|rstr| format!("\x1b[1m{rstr}\x1b[0m").into()))
                             .collect(),
+                        "code" => {
+                            let width = ret
+                                .iter()
+                                .map(|tl| tl.display(false).len())
+                                .max()
+                                .unwrap_or(0);
+                            ret.into_iter()
+                                .map(|tl| {
+                                    tl.map(|rstr| {
+                                        format!("\x1b[38;5;250;48;5;240m{rstr:width$}\x1b[0m")
+                                            .into()
+                                    })
+                                })
+                                .collect()
+                        }
                         _ => ret,
                     };
                     match properties.get("id") {
