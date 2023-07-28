@@ -104,6 +104,7 @@ impl From<&str> for TerminalLine {
 pub enum InteractionType {
     // Input(String),
     // Toggle(bool),
+    Image(RStr),
     Link(RStr),
     None,
 }

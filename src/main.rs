@@ -14,6 +14,7 @@ use crossterm::{
     terminal::{self, disable_raw_mode, enable_raw_mode, SetTitle},
 };
 use lazy_regex::lazy_regex;
+use utils::transform_url_text;
 
 mod cacher;
 mod img;
@@ -176,15 +177,16 @@ fn browser_key_event(
                     verbose,
                 );
                 breadcrumbs.push(String::from(&*link));
-                *focused = lazy_regex!("#([\\w_-]*)$")
-                    .captures(&link)
-                    .map_or(0, |captures| {
-                        let id = captures.get(1).unwrap().as_str();
-                        htmelements
-                            .iter()
-                            .position(|tl| tl.check_id(id))
-                            .unwrap_or(0)
-                    });
+                *focused =
+                    lazy_regex!("#([\\w\\d_%\\-]*)$")
+                        .captures(&link)
+                        .map_or(0, |captures| {
+                            let id = transform_url_text(captures.get(1).unwrap().as_str());
+                            htmelements
+                                .iter()
+                                .position(|tl| tl.check_id(&id))
+                                .unwrap_or(0)
+                        });
             }
         }
         KeyCode::Char('r') => {

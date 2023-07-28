@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, iter::Peekable};
 
 use crate::{
     types::{DocElement, RStr, SELF_CLOSING_TAGS},
-    utils::transform_text,
+    utils::transform_html_text,
 };
 
 /// pure fn to convert text data to html
@@ -90,7 +90,7 @@ fn inner_parse<T: Iterator<Item = char>>(chars: &mut Peekable<T>) -> Result<DocE
                 txt_buf.push(*c);
                 chars.next();
             }
-            Ok(DocElement::Text(transform_text(&txt_buf)))
+            Ok(DocElement::Text(transform_html_text(&txt_buf)))
         }
         None => Ok(DocElement::Text(RStr::from(""))),
     }
@@ -155,7 +155,7 @@ fn get_opening_properties<T: Iterator<Item = char>>(
             }
         }
         consume_whitespace(chars);
-        props_buf.insert(prop.into(), transform_text(&content));
+        props_buf.insert(prop.into(), transform_html_text(&content));
     }
     // let Some('>') = chars.next() else { return Err(format!("Missing `>` for `<{tag_name}>`")) };
     // This is where it checks if you need a closing tag

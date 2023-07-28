@@ -27,7 +27,8 @@ pub fn get_link_destination(current: &str, link: &RStr) -> RStr {
     }
 }
 
-pub fn transform_text(input: &str) -> RStr {
+/// replace things like &#x24; and &lt;
+pub fn transform_html_text(input: &str) -> RStr {
     // get hex entities
     let input = lazy_regex!("&#x([0-9a-fA-F]+);")
         .replace_all(input, |caps: &regex::Captures| {
@@ -75,6 +76,35 @@ pub fn transform_text(input: &str) -> RStr {
         .into()
 }
 
+pub fn transform_url_text(input: &str) -> String {
+    lazy_regex!("%([a-fA-F0-9]{2})")
+        .replace_all(input, |caps: &regex::Captures| {
+            String::from(
+                // by regex, we know this is valid
+                match i64::from_str_radix(caps.get(1).unwrap().as_str(), 16).unwrap() {
+                    32 => " ",
+                    33 => "!",
+                    34 => "\"",
+                    35 => "#",
+                    36 => "$",
+                    37 => "%",
+                    38 => "&",
+                    39 => "'",
+                    40 => "(",
+                    41 => ")",
+                    42 => "*",
+                    43 => "+",
+                    44 => ",",
+                    45 => "-",
+                    46 => ".",
+                    47 => "/",
+                    _ => "",
+                },
+            )
+        })
+        .to_string()
+}
+
 /// transform rgb values to 8-bit colors
 ///
 /// source: <https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797>
@@ -113,13 +143,13 @@ pub fn wrap(txt: &str, width: usize) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{get_link_destination, rgb_to_256, transform_text};
+    use super::{get_link_destination, rgb_to_256, transform_html_text};
 
     #[test]
     fn transform() {
-        assert_eq!(transform_text("&lt;&gt;"), "<>".into());
-        assert_eq!(transform_text("&#60;&#62;"), "<>".into());
-        assert_eq!(transform_text("&#xae;"), transform_text("&reg;"));
+        assert_eq!(transform_html_text("&lt;&gt;"), "<>".into());
+        assert_eq!(transform_html_text("&#60;&#62;"), "<>".into());
+        assert_eq!(transform_html_text("&#xae;"), transform_html_text("&reg;"));
     }
 
     #[test]

@@ -246,14 +246,23 @@ fn display_img(
             if verbose {
                 print!("The thing `display_img` got from cache worked\r\n");
             }
-            Some(img::approximate_image(
+            let img = img::approximate_image(
                 &img,
                 {
                     let size = terminal::size().unwrap();
                     ((size.0 / 2).into(), (size.1 / 2).into())
                 },
                 verbose,
-            ))
+            );
+            if let Some(src) = src {
+                Some(
+                    img.into_iter()
+                        .map(|tl| tl.with_interaction(InteractionType::Image(src.clone())))
+                        .collect(),
+                )
+            } else {
+                Some(img)
+            }
         })
     })
     .unwrap_or_else(|| {
