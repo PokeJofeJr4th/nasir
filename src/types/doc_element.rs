@@ -1,5 +1,4 @@
 use std::{
-    cmp::max,
     collections::BTreeMap,
     sync::{Arc, Mutex},
 };
@@ -118,6 +117,7 @@ impl DocElement {
 }
 
 /// pure function to apply special formatting to the output of `DocElement::display`
+#[allow(clippy::too_many_lines)]
 fn display_formatted_element(
     name: &str,
     properties: &BTreeMap<RStr, RStr>,
@@ -156,7 +156,7 @@ fn display_formatted_element(
         "code" => {
             let width = ret
                 .iter()
-                .map(|tl| max(tl.display(false).len(), tl.display(true).len()) - 1)
+                .map(TerminalLine::max_visible_length)
                 .max()
                 .unwrap_or(0);
             ret.into_iter()
@@ -168,42 +168,42 @@ fn display_formatted_element(
         "h1" => {
             let width = ret
                 .iter()
-                .map(|tl| max(tl.display(false).len(), tl.display(true).len()) - 1)
+                .map(TerminalLine::max_visible_length)
                 .max()
                 .unwrap_or(0);
             let mut buf = vec![TerminalLine::from(format!("╔{:═<width$}╗", ""))];
-            buf.extend(
-                ret.into_iter()
-                    .map(|tl| tl.map(|rstr| format!("║\x1b[30;47m{rstr:width$}\x1b[0m║").into())),
-            );
+            buf.extend(ret.into_iter().map(|tl| {
+                tl.visible_right_pad(width)
+                    .map(|rstr| format!("║\x1b[30;47m{rstr}\x1b[0m║").into())
+            }));
             buf.push(TerminalLine::from(format!("╚{:═<width$}╝", "")));
             buf
         }
         "h2" => {
             let width = ret
                 .iter()
-                .map(|tl| max(tl.display(false).len(), tl.display(true).len()) - 1)
+                .map(TerminalLine::max_visible_length)
                 .max()
                 .unwrap_or(0);
             let mut buf = vec![TerminalLine::from(format!("╔{:═<width$}╗", ""))];
-            buf.extend(
-                ret.into_iter()
-                    .map(|tl| tl.map(|rstr| format!("║{rstr:width$}║").into())),
-            );
+            buf.extend(ret.into_iter().map(|tl| {
+                tl.visible_right_pad(width)
+                    .map(|rstr| format!("║{rstr}║").into())
+            }));
             buf.push(TerminalLine::from(format!("╚{:═<width$}╝", "")));
             buf
         }
         "h3" => {
             let width = ret
                 .iter()
-                .map(|tl| max(tl.display(false).len(), tl.display(true).len()) - 1)
+                .map(TerminalLine::max_visible_length)
                 .max()
                 .unwrap_or(0);
             let mut buf = vec![TerminalLine::from(format!("┌{:─<width$}┐", ""))];
-            buf.extend(
-                ret.into_iter()
-                    .map(|tl| tl.map(|rstr| format!("│{rstr:width$}│").into())),
-            );
+            buf.extend(ret.into_iter().map(|tl| {
+                tl.visible_right_pad(width)
+                    .map(|rstr| format!("│{rstr}│").into())
+            }));
             buf.push(TerminalLine::from(format!("└{:─<width$}┘", "")));
             buf
         }

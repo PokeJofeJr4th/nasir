@@ -164,4 +164,9 @@ mod tests {
     fn colors() {
         assert_eq!(rgb_to_256((0, 0, 0)), 16);
     }
+
+    // #[test]
+    // fn visible_length() {
+    //     assert_eq!(get_visible_length("\x1b[31;5;1;1;1mHeyy\x1b[0m"), 4);
+    // }
 }
