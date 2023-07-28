@@ -250,7 +250,7 @@ fn display_img(
                 &img,
                 {
                     let size = terminal::size().unwrap();
-                    ((size.0 / 2).into(), (size.1 / 2).into())
+                    ((size.0 / 3 * 2).into(), (size.1 / 3 * 2).into())
                 },
                 verbose,
             );

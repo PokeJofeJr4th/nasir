@@ -27,9 +27,9 @@ pub fn approximate_image(
     term_size: (u32, u32),
     verbose: bool,
 ) -> Vec<TerminalLine> {
-    let term_width = term_size.0 - 1;
-    let term_height = term_size.1;
     let (img_width, img_height) = img.dimensions();
+    let (term_width, term_height) =
+        get_img_viewport((img_width * 2, img_height), (term_size.0 - 1, term_size.1));
     let mut termlines = Vec::new();
     for row in 0..(term_height - 1) {
         let row_iter = (row * img_height / term_height)
@@ -67,4 +67,35 @@ pub fn approximate_image(
         termlines.push(TerminalLine::from(current_line));
     }
     termlines
+}
+
+/// given the size of an image and the terminal, figure out how big to make the image
+const fn get_img_viewport((img_w, img_h): (u32, u32), (term_w, term_h): (u32, u32)) -> (u32, u32) {
+    // start with the image size
+    // if the image is too tall, squash it
+    let (img_w_2, img_h_2) = if img_h > term_h {
+        (img_w * term_h / img_h, term_h)
+    } else {
+        (img_w, img_h)
+    };
+    // if the image is too long, squish it
+    if img_w_2 > term_w {
+        (term_w, img_h_2 * term_w / img_w_2)
+    } else {
+        (img_w_2, img_h_2)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::img::get_img_viewport;
+
+    #[test]
+    fn img_viewport() {
+        assert_eq!(get_img_viewport((2, 2), (4, 4)), (2, 2));
+        assert_eq!(get_img_viewport((4, 4), (2, 2)), (2, 2));
+        assert_eq!(get_img_viewport((2, 4), (4, 4)), (2, 4));
+        assert_eq!(get_img_viewport((10, 10), (8, 4)), (4, 4));
+        assert_eq!(get_img_viewport((20, 10), (8, 4)), (8, 4));
+    }
 }
